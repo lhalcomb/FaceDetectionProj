@@ -1,0 +1,9 @@
+torch
+torchvision
+facenet-pytorch
+face_recognition #this has dependencies, I will mention more in a ReadMe.md
+numpy
+scikit-learn
+hdbscan
+Pillow
+matplotlib
