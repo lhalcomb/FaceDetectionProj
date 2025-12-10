@@ -1,76 +1,119 @@
-# GenLift Take-Home: Unsupervised Face Grouping
+# Face Clustering with FaceNet + HDBSCAN
 
-## Objective
+An automated pipeline for detecting, embedding, and clustering faces in images using deep learning. The system leverages a pretrained FaceNet model for face embeddings and HDBSCAN for robust identity clustering, generating comprehensive artifacts for analysis and visualization.
 
-Group unlabeled face photos by person and produce a machine-readable mapping. Your solution should be reproducible, explainable, and runnable on a typical laptop (CPU-only).
+## Features
 
-## What you’re given
+- **Face Detection & Alignment**: MTCNN-based detection with automated alignment
+- **Deep Face Embeddings**: InceptionResnetV1 (FaceNet) pretrained model
+- **Intelligent Clustering**: HDBSCAN algorithm for density-based grouping
+- **Rich Visualizations**: 3D PCA projections and dendrogram plots
+- **Organized Outputs**: Per-cluster directories, CSV reports, and thumbnail grids
 
-- `faces/` — JPEG images named `image_001.jpg`, `image_002.jpg`, …
-  Filenames are intentionally randomized; **do not assume any ordering leaks identity**.
+## Repository Structure
 
-We will validate your pipeline on a **private holdout set** during review.
+```
+.
+├── requirements.txt          # Python dependencies
+├── test.py                   # Main pipeline script
+├── notebooks/
+│   └── analysis.ipynb       # Exploratory analysis notebook
+└── artifacts/               # Generated outputs (created on run)
+```
 
-## What to deliver (core)
+## Setup
 
-1. **Embeddings → Clusters**
+### 1. Create Virtual Environment
 
-   - Extract face embeddings with an off-the-shelf backbone of your choice.
-   - Cluster images by identity.
+```bash
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
 
-2. **Artifacts (place in `artifacts/`)**
+### 2. Install Dependencies
 
-   - `clusters.csv` — two columns: `image_filename,cluster_id` (use `-1` for outliers).
-   - `outliers.csv` — list of filenames flagged as outliers (if any).
-   - `viz_3d.png` — 3D projection colored by cluster.
-   - _(Optional but appreciated)_ 2–3 thumbnail grids for representative clusters.
+```bash
+pip install -r requirements.txt
+```
 
-3. **Notebook + brief report**
+> **Note**: An alternative approach using `face_recognition` was explored. Ask about this in follow-up interview if you're interested in comparing methods.
 
-   - A single **Jupyter notebook** (`notebooks/analysis.ipynb`) that:
+## Usage
 
-     - runs end-to-end on the provided `faces/`,
-     - explains parameter choices (e.g., distance metric, `eps`/`min_samples`),
-     - shows diagnostics (k-distance plot or similar) and the 3D viz,
-     - notes failure modes and what you’d improve with more time.
+### Option A: Run the Python Script
 
-4. **Reproducibility**
+```bash
+python test.py
+```
 
-   - `requirements.txt` or `pyproject.toml`
-   - `run.sh` (or a clear README section) that executes your notebook non-interactively (e.g., `papermill`/`jupyter nbconvert`) and writes the artifacts above.
-   - Set seeds where applicable.
+This executes the complete pipeline from face detection through clustering and visualization.
 
-## Constraints & guidelines
+### Option B: Run the Jupyter Notebook
 
-- **Runtime/Hardware:** CPU-only; aim for ≤30 minutes on a modest laptop, ≤4GB RAM.
-- **Allowed libs:** numpy, pandas, scikit-learn, pillow/opencv, torch/tf (pretrained backbones), faiss (optional), umap-learn, matplotlib.
-- **Evaluation hint:** For self-checking, compute a simple cluster quality proxy (e.g., pairwise precision/recall on a few self-labeled pairs you inspect). We will use our own checks on the holdout.
+```bash
+jupyter notebook
+```
+Also, to see the thumbnails.png you can just run the thumbCluster.py file. 
+```bash
+python thumbCluster.py
+```
 
-## Stretch (pick 1–2 if time allows)
+Navigate to `notebooks/analysis.ipynb` and run all cells for an interactive, step-by-step walkthrough.
 
-- Simple CLI (`cluster --images faces/ --out artifacts/`).
-- Small parameter sweep with a table/plot of quality vs. `eps`/`min_samples`.
-- “Data-retention” exercise: emit an audit manifest showing how you would delete raw images while retaining embeddings.
+## Output Structure
 
-## Submission
+All results are saved to the `artifacts/` directory:
 
-- Share a Git repo or zipped folder with:
+```
+artifacts/
+├── clusters.csv              # Cluster assignments: image_filename, cluster_id
+├── outliers.csv             # List of outlier images (cluster_id = -1)
+├── viz_3d.png               # 3D PCA visualization colored by cluster
+├── Condensed_Tree.png       # HDBSCAN dendrogram 
+├── cluster_0/               # Images belonging to cluster 0
+│   ├── image_019.jpg
+│   ├── image_139.jpg
+|   |__ ...
 
-  - `faces/` **excluded**, but your code assumes that structure.
-  - `notebooks/analysis.ipynb`, `artifacts/` (from a sample run), environment files, and `run.sh`.
+│   └── thumbnail_grid.png   # Visual summary of cluster
+├── cluster_1/
+│   └── ...
+└── outliers/                # Unclustered faces
+    └── ...
+```
 
-- Include a short top-level `README.md` with exact run commands.
+### Output Files Explained
 
-## Review
+- **`clusters.csv`**: Two-column CSV mapping each image filename to its cluster ID (`-1` indicates outliers)
+- **`outliers.csv`**: Dedicated list of images that couldn't be reliably clustered
+- **`viz_3d.png`**: 3D scatter plot showing embedding space with color-coded clusters
+- **`cluster_N/`**: Directories containing all faces assigned to cluster N, plus a thumbnail grid for quick review seen as **`thumbnail.png`**
 
-We will:
+## Pipeline Overview
 
-1. Recreate your environment, run your pipeline on our holdout, and confirm artifacts.
-2. Skim your notebook for reasoning grounded in your own outputs.
-3. Do a brief live follow-up (e.g., adjust a parameter or swap distance metric) to understand your approach.
+The clustering pipeline follows these steps:
+
+1. **Face Detection**: MTCNN detects and crops faces from input images
+2. **Face Alignment**: Geometric normalization for consistent embedding quality
+3. **Embedding Generation**: InceptionResnetV1 produces 512-dimensional face vectors
+4. **Normalization**: L2 normalization of embeddings for cosine similarity
+5. **Clustering**: HDBSCAN groups similar faces without requiring cluster count specification
+6. **Visualization**: PCA reduction to 3D for interpretable plotting
+7. **Export**: Organized outputs with CSV reports and per-cluster image directories
+
+## Technical Details
+
+- **Face Detector**: Multi-task Cascaded Convolutional Networks (MTCNN)
+- **Embedding Model**: InceptionResnetV1 pretrained on VGGFace2
+- **Clustering Algorithm**: Hierarchical DBSCAN (density-based, handles noise)
+- **Dimensionality Reduction**: PCA for visualization only (clustering uses full embeddings)
+
+## Notes
+
+- Outliers (cluster `--1`) represent faces that don't fit well into any cluster—these may be low-quality detections, unique individuals with single photos, or significantly different poses/expressions
+- HDBSCAN automatically determines the number of clusters based on data density
+- The pipeline is fully reproducible given the same input images and random seed
 
 ---
 
-### Attribution
-
-Portions of this dataset are derived from the **Caltech Faces Dataset (1999)**. The data are used here solely for educational and evaluation purposes. Caltech is not affiliated with this exercise.
+**Questions?** Feel free to reach out or review the exploratory notebook for detailed methodology and parameter tuning insights. Hope to hear from you soon!
