@@ -3,7 +3,7 @@ torchvision
 facenet-pytorch
 face_recognition #this has dependencies, I will mention more in a ReadMe.md
 numpy
-scikit-learn
-hdbscan
+scikit-learn==1.4.2
+hdbscan==0.8.40
 Pillow
 matplotlib

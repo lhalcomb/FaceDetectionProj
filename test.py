@@ -3,18 +3,22 @@ import numpy as np
 from facenet_pytorch import InceptionResnetV1, MTCNN
 from PIL import Image
 import torch
+import random
 
 #ML Helper Libraries
 from sklearn.decomposition import PCA
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import normalize
+from sklearn.manifold import TSNE
 from hdbscan import HDBSCAN
+
 
 #libraries for file manipulation
 import glob as glob 
 import csv, os
 
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 #Silencing warnings — these aren't hurting performance
 import warnings
@@ -102,7 +106,6 @@ for img_path in images:
 #print(labels)
 
 
-
 # used for facenet-pytorch and HDBSCAN
 X = np.array(embeddings, dtype=np.float32)
 
@@ -121,18 +124,26 @@ print("After filtering:", X.shape)
 print("NaNs:", np.isnan(X).sum(), "Infs:", np.isinf(X).sum())
 print("Norm range:", np.linalg.norm(X, axis=1).min(), np.linalg.norm(X, axis=1).max())
 
+#saving normalized embeddings
+# np.savez("normalized_embeddings.npz",
+#          embeddings=X.astype(np.float32),
+#          paths=np.array(valid_paths))
+
+
+
 # # ---- clustering ----
 clusterer = HDBSCAN(
         min_cluster_size=3,
         min_samples=1,
         metric='euclidean',
         cluster_selection_epsilon=0.2)
-labels = clusterer.fit_predict(X)
+
+labels = clusterer.fit_predict(X) 
 
 # ---- HDBSCAN condensed tree diagnostic ----
-clusterer.condensed_tree_.plot(select_clusters=True)
-plt.title("HDBSCAN Condensed Tree")
-plt.show()
+# clusterer.condensed_tree_.plot(select_clusters=True)
+# plt.title("HDBSCAN Condensed Tree")
+# plt.show()
 
 """Step 2. Place the appropriate clusters into the cluster.csv as well as outliers.csv. Also, below is PCA of the 3D projection colored by cluster """
 os.makedirs("artifacts", exist_ok=True)
@@ -162,9 +173,9 @@ for label, path in zip(labels, valid_paths):
 #PCA for all clusters
 
 cluster_amt = max(labels) #23 clusters
-#print(cluster_amt)
+print(cluster_amt)
 
-pca = PCA(n_components=3)
+pca = PCA(n_components=10)
 points3d = pca.fit_transform(X)
 
 fig = plt.figure()
@@ -178,10 +189,69 @@ scatter = ax.scatter(
     s=15
 )
 
+explained_variance = pca.explained_variance_ratio_
+print(f"Explained variance from the PCA: {explained_variance} \n Sum of the explained variance from the PCA: {sum(explained_variance)}")
+
+#plt.savefig("artifacts/viz_3d.png", dpi=200)
+# plt.close()
+
+# t-SNE from the 512-dim vectors
+tsne = TSNE(
+    n_components=3,
+    learning_rate='auto',
+    init='random',
+    perplexity=30
+)
+
+X_3d = tsne.fit_transform(X)
+# Plot
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.scatter(
+    X_3d[:, 0],
+    X_3d[:, 1],
+    X_3d[:, 2],
+    s=5
+)
+
+plt.title("t-SNE Projection of Face Embeddings")
+plt.show()
 
 
-plt.savefig("artifacts/viz_3d.png", dpi=200)
-plt.close()
+#pick out random cluster and display images in that cluster
+
+unique_labels = list(set(labels))
+random_label = random.choice(unique_labels)
+print(f"Selected Cluster: {random_label}")
+
+#Get all the images in that cluster
+cluster_images = [path for label, path in zip(labels, valid_paths) if label == random_label]
+print(f"Number of images in cluster {random_label}: {len(cluster_images)}")
+
+# Display the images in a grid
+num_images = len(cluster_images)
+cols = min(5, num_images)  # max 5 columns
+rows = (num_images + cols - 1) // cols  # ceiling division
+
+fig, axes = plt.subplots(rows, cols, figsize=(cols*3, rows*3))
+if num_images == 1:
+    axes = [axes]
+else:
+    axes = axes.flatten() if num_images > 1 else [axes]
+
+for idx, img_path in enumerate(cluster_images):
+    img = Image.open(img_path)
+    axes[idx].imshow(img)
+    axes[idx].axis('off')
+    axes[idx].set_title(os.path.basename(img_path), fontsize=8)
+
+# Hide any unused subplots
+for idx in range(num_images, len(axes)):
+    axes[idx].axis('off')
+
+plt.suptitle(f'Cluster {random_label} - {num_images} images', fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
 
 
 
